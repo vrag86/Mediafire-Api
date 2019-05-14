@@ -183,6 +183,57 @@ sub uploadFile {
     return $mediafire_file;
 }
 
+sub findFileByName {
+    my ($self, %opt)        = @_;
+    my $filename            = $opt{-filename}       // croak "You must specify '-filename' param";
+
+    my @mediafire_files;
+    my $url = 'https://www.mediafire.com/api/1.4/folder/search.php';
+    my %param = (
+        'r'                 => 'qzpa',
+        'search_text'       => $filename,
+        'version'           => '2.5',
+        'search_all'        => 'yes',
+        'folder_key'        => '', 
+        'filter'            => 'all',
+        'session_token'     => $self->{session_token},
+        'response_format'   => 'json',
+    );
+    my $full_url = $url . '?' . join('&', map {"$_=" . uri_escape($param{$_})} keys %param);
+    my $res = $self->{ua}->get($full_url);
+    my $code = $res->code;
+    if ($code ne '200') {
+        croak "Can't search file. Wrong response code on url '$full_url'. Code: $code";
+    }
+
+    my $json_res = eval {
+        decode_json($res->decoded_content);
+    };
+    if ($@) {
+        croak "Can't decode response to json. Response: '" . $res->decoded_content . "'";
+    }
+
+    for my $f (@{$json_res->{response}->{results}}) {
+        # If not file
+        if ($f->{type} ne 'file') {
+            next;
+        }
+
+        # If in Trash folder
+        if ($f->{parent_name} eq 'Trash') {
+            next;
+        }
+
+        push @mediafire_files, 
+            Mediafire::Api::File->new(
+                -size       => $f->{size},
+                -key        => $f->{quickkey},
+            );
+    }
+
+    return \@mediafire_files;
+}
+
 =pod Вынести в отдельный класс с проверкой наличия такой директории
 sub createDir {
     my ($self, %opt)            = @_;
@@ -260,7 +311,7 @@ B<Mediafire::Api> - Upload and Download files from mediafire.com file sharing
 
 =head1 DEPENDENCE
 
-L<LWP::UserAgent>, L<JSON::XS>, L<URI::Escape>, L<Encode>, L<HTTP::Request>, L<Carp>, L<File::Basename>
+L<LWP::UserAgent>, L<JSON::XS>, L<URI::Escape>, L<Encode>, L<HTTP::Request>, L<Carp>, L<File::Basename>, L<MIME::Detect>
 
 =head1 AUTHORS
 

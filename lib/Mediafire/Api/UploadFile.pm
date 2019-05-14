@@ -12,6 +12,7 @@ use LWP::ConnCache;
 use File::Basename;
 use HTTP::Request;
 use JSON::XS;
+use MIME::Detect;
 use Crypt::Digest::SHA256 qw/sha256_hex/;
 use Time::HiRes qw/gettimeofday/;
 use IO::Socket::SSL;
@@ -26,14 +27,16 @@ our $VERSION = '0.01';
 my $DEFAULT_BUFF_SIZE           = 1048576;
 
 ############################ PRIVATE METHODS ############################################
-my $getSha256Sum = sub {
+my ($getSha256Sum, $checkUploadFile, $getFileFromCache, $checkResumeUpload, $getMimeType, $uploadF);
+
+$getSha256Sum = sub {
     my ($fname) = @_;
     my $sha = Crypt::Digest::SHA256->new();
     $sha->addfile($fname);
     return $sha->hexdigest;
 };
 
-my $checkUploadFile = sub {
+$checkUploadFile = sub {
     my ($self) = @_;
 
     my $url = 'https://www.mediafire.com/api/1.5/upload/check.php';
@@ -87,7 +90,7 @@ my $checkUploadFile = sub {
     return $response;
 };
 
-my $getFileFromCache = sub {
+$getFileFromCache = sub {
     my ($self) = @_;
 
     my $url = 'https://www.mediafire.com/api/1.5/upload/instant.php';
@@ -130,7 +133,7 @@ my $getFileFromCache = sub {
     return 1;
 };
 
-my $checkResumeUpload = sub {
+$checkResumeUpload = sub {
     my ($self) = @_;
 
     my $ua = $self->{ua};
@@ -163,7 +166,7 @@ my $checkResumeUpload = sub {
 };
 
 # Upload file
-my $uploadF = sub {
+$uploadF = sub {
     my ($self) = @_;
 
     my $upload_file     = $self->{upload_file};
@@ -176,7 +179,6 @@ my $uploadF = sub {
     my $param_str = join('&', map {"$_=" . uri_escape($param{$_})} keys %param);
     my $url = $self->{upload_url} . '?' . $param_str;
 
-    my $file_type = 'application/zip';
     my $unit_id = 0;
     my $filebuf;
     open my $FH, "<$upload_file" or croak "Can't open $upload_file $!";
@@ -194,7 +196,7 @@ my $uploadF = sub {
             "Origin"            => "https://www.mediafire.com",
             "X-Filesize"        => $self->{file}->size,
             "X-Filename"        => $self->{file}->name,
-            "X-Filetype"        => $file_type,
+            "X-Filetype"        => $getMimeType->($self->{file}->name),
             "X-Filehash"        => $self->{file}->hash,
             "X-Unit-Hash"       => $unit_hash,
             "X-Unit-Size"       => $bytes,
@@ -222,10 +224,8 @@ my $uploadF = sub {
         if ($json_res->{response}->{resumable_upload}->{all_units_ready} eq 'yes') {
             last;
         }
-        p $json_res;
 
         ++$unit_id;
-
     }
     close $FH;
 
@@ -234,9 +234,18 @@ my $uploadF = sub {
         croak "Not all parts of file '$upload_file' uploaded. Wrong answer from server";
     }
 
-    p $json_res;
-
     return 1;
+};
+
+$getMimeType = sub {
+    my ($fname) = @_;
+    my $default_mime = 'application/zip';
+    my $mime = MIME::Detect->new();
+    my @types = $mime->mime_types_from_name($fname);
+    if (@types) {
+        return $types[0]->mime_type;
+    }
+    return $default_mime;
 };
 
 ########################################################################################

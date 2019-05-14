@@ -19,6 +19,7 @@ use utf8;
 use strict;
 use warnings;
 use File::Spec;
+use File::Basename;
 
 my $CURR_DIR;
 BEGIN {
@@ -53,6 +54,7 @@ SKIP: {
     }
 
     testUploadFile($mediafire, $UPLOAD_FILE);
+    testFindFileByName($mediafire, basename($UPLOAD_FILE));
 
 };
 
@@ -78,6 +80,18 @@ sub testUploadFile {
 
     my $doupload_key = $upload_file->key;
     ok($doupload_key, "Test upload file. DouploadKey: $doupload_key");
+}
+
+sub testFindFileByName {
+    my ($mediafire, $filename) = @_;
+    my $res = $mediafire->findFileByName(
+        -filename       => $filename,
+    );
+
+    ok (@$res, "Test findFileByName ok");
+    my $doupload_key = $res->[0]->key;
+    ok($doupload_key, "Find file doupload_key: $doupload_key");
+
 }
 
 

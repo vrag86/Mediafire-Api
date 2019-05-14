@@ -73,7 +73,11 @@ sub testUploadFile {
     my ($mediafire, $file) = @_;
     my $upload_file = $mediafire->uploadFile(
         -file           => $file,
+        -path           => 'myfiles',
     );
+
+    my $doupload_key = $upload_file->key;
+    ok($doupload_key, "Test upload file. DouploadKey: $doupload_key");
 }
 
 

@@ -179,9 +179,104 @@ sub uploadFile {
         -ua             => $self->{ua},
         -session_token  => $self->{session_token},
     );
-    $upload_file->uploadFile(%opt);
-    return $upload_file;
+    my $mediafire_file = $upload_file->uploadFile(%opt);
+    return $mediafire_file;
 }
 
+=pod Вынести в отдельный класс с проверкой наличия такой директории
+sub createDir {
+    my ($self, %opt)            = @_;
+    my $dirname                 = $opt{-dirname}    // croak "You must specify '-dirname' param";
+
+    my $url = 'https://www.mediafire.com/api/1.4/folder/create.php';
+    my %param = (
+        'r'                 => 'sloe',
+        'foldername'        => $dirname,
+        'parent_key'        => '', 
+        'session_token'     => $self->{session_token},
+        'response_format'   => 'json',
+    );
+    $url . = '?' . join('&', map {"$_=" . uri_escape($param{$_})} keys %param);
+    my $res = $self->{ua}->get($url);
+    my $code = $res->code;
+    if ($code ne '200') {
+        croak "Can't create dir '$dirname'. Code: $code";
+    }
+    my $json_res = decode_json($res->decoded_content);
+    p $json_res;
+}
+=cut
 
 1;
+
+__END__
+=pod
+
+=encoding UTF-8
+
+=head1 NAME
+
+B<Mediafire::Api> - Upload and Download files from mediafire.com file sharing
+
+=head1 VERSION
+
+    version 0.01
+
+=head1 SYNOPSYS
+
+=head1 METHODS
+    
+    use Mediafire::Api;
+
+    # Create Mediafire::Api object
+    my $mediafire = Mediafire::Api->new();
+
+    # Login on service
+    $mediafire->login(
+        -login          => $login,
+        -password       => $password,
+    );
+
+    # Upload file to server
+    my $remote_dir  = 'myfiles';            # Directory name on server
+    my $filename = '/tmp/test_file.zip';    # Full file path to upload
+
+    # Upload file on server. Return Mediafire::Api::UploadFile object
+    my $mediafire_file = $mediafire->uploadFile(
+        -file           => $filename,
+        -path           => $remote_dir,
+    );
+    # Get uploaded file key
+    print "Uploaded file key: " . $mediafire_file->getDouploadKey() . "\n";
+
+    
+
+=head1 Upload Files to server
+
+
+=head2 new()
+
+=head2 login(%opt)
+
+=head1 DEPENDENCE
+
+L<LWP::UserAgent>, L<JSON::XS>, L<URI::Escape>, L<Encode>, L<HTTP::Request>, L<Carp>, L<File::Basename>
+
+=head1 AUTHORS
+
+=over 4
+
+=item *
+
+Pavel Andryushin <vrag867@gmail.com>
+
+=back
+
+=head1 COPYRIGHT AND LICENSE
+
+This software is copyright (c) 2019 by Pavel Andryushin.
+
+This is free software; you can redistribute it and/or modify it under
+the same terms as the Perl 5 programming language system itself.
+
+=cut

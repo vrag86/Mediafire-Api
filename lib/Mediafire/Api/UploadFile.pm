@@ -16,6 +16,8 @@ use Crypt::Digest::SHA256 qw/sha256_hex/;
 use Time::HiRes qw/gettimeofday/;
 use IO::Socket::SSL;
 
+use Mediafire::Api::File;
+
 use Data::Printer;
 
 our $VERSION = '0.01';
@@ -40,9 +42,9 @@ my $checkUploadFile = sub {
     my $microseconds = substr(join('', @sec), 0, 13);
 
     my %param = (
-        'hash'              => $self->{file_hash},
-        'size'              => $self->{file_size},
-        'filename'          => $self->{basename},
+        'hash'              => $self->{file}->hash,
+        'size'              => $self->{file}->size,
+        'filename'          => $self->{file}->name,
         'unit_size'         => $self->{buff_size},
         'resumable'         => 'yes',
         'preemptive'        => 'yes',
@@ -79,8 +81,52 @@ my $checkUploadFile = sub {
 
     p $response;
 
-    $self->{preemptive_quickkey} = $response->{preemptive_quickkey};
+    my $file_key = $response->{preemptive_quickkey} // $response->{duplicate_quickkey};
+    $self->{file}->key($file_key);
     $self->{upload_url} = $response->{upload_url}->{resumable};
+    return $response;
+};
+
+my $getFileFromCache = sub {
+    my ($self) = @_;
+
+    my $url = 'https://www.mediafire.com/api/1.5/upload/instant.php';
+
+    my @sec = gettimeofday();
+    my $microseconds = substr(join('', @sec), 0, 13);
+
+    my %param = (
+        'hash'              => $self->{file}->hash,
+        'size'              => $self->{file}->size,
+        'filename'          => $self->{file}->name,
+        'folder_key'        => $self->{path},
+        'session_token'     => $self->{session_token},
+        'response_format'   => 'json',
+        $microseconds       => '', 
+    );
+
+    my $param_str = join('&', map {"$_=" . uri_escape($param{$_})} keys %param);
+    my $full_url = $url . '?' . $param_str;
+    my $res = $self->{ua}->get($full_url);
+    my $code = $res->code;
+    if ($code ne '200') {
+        croak "Wrong response code checkUploadFile(). Url: '$full_url'. Code: $code";
+    }
+    my $json_res = eval {
+        decode_json($res->decoded_content);
+    };
+    if ($@) {
+        croak "Can't parse respone '" . $res->decoded_content . "' to json";
+    }
+
+    # Get json response
+    my $response = $json_res->{response};
+    if ($response->{result} ne 'Success') {
+        croak "getFileFromCache() not success";
+    }
+    my $file_key = $response->{quickkey};
+    $self->{file}->key($file_key);
+
     return 1;
 };
 
@@ -146,10 +192,10 @@ my $uploadF = sub {
             "Content-Type"      => "application/octet-stream",
             "Referer"           => "https://www.mediafire.com/uploads",
             "Origin"            => "https://www.mediafire.com",
-            "X-Filesize"        => $self->{file_size},
-            "X-Filename"        => $self->{basename},
+            "X-Filesize"        => $self->{file}->size,
+            "X-Filename"        => $self->{file}->name,
             "X-Filetype"        => $file_type,
-            "X-Filehash"        => $self->{file_hash},
+            "X-Filehash"        => $self->{file}->hash,
             "X-Unit-Hash"       => $unit_hash,
             "X-Unit-Size"       => $bytes,
             "X-Unit-Id"         => $unit_id,
@@ -176,6 +222,7 @@ my $uploadF = sub {
         if ($json_res->{response}->{resumable_upload}->{all_units_ready} eq 'yes') {
             last;
         }
+        p $json_res;
 
         ++$unit_id;
 
@@ -186,6 +233,8 @@ my $uploadF = sub {
     if ($json_res->{response}->{resumable_upload}->{all_units_ready} ne 'yes') {
         croak "Not all parts of file '$upload_file' uploaded. Wrong answer from server";
     }
+
+    p $json_res;
 
     return 1;
 };
@@ -214,14 +263,31 @@ sub uploadFile {
         croak "File '" . $self->{upload_file} . "' not exists";
     }
 
-    # Get all info about file
-    $self->{file_hash}          = $getSha256Sum->($self->{upload_file});
-    $self->{file_size}          = -s $self->{upload_file};
-    $self->{basename}           = basename($self->{upload_file});
+    $self->{file} = Mediafire::Api::File->new(
+        -size               => -s $self->{upload_file},
+        -name               => basename($self->{upload_file}),
+        -hash               => $getSha256Sum->($self->{upload_file}),
+    );
 
-    $self->$checkUploadFile();
-    $self->$checkResumeUpload();
-    $self->$uploadF();
+
+    # Get upload url
+    my $response = $self->$checkUploadFile();
+    if ($response->{hash_exists} eq 'yes') {
+        # No need upload file. Get file from cache
+        $self->$getFileFromCache();
+    }
+    else {
+        # Upload file
+        $self->$checkResumeUpload();
+        $self->$uploadF();
+    }
+
+    # Check exists file key
+    if (not defined($self->{file}->key)) {
+        croak "Key of upload file '$self->{upload_file}' not exists. Error on upload file to server";
+    }
+
+    return $self->{file};
 }
 
 

@@ -244,29 +244,6 @@ sub downloadFile {
 
 }
 
-=pod Вынести в отдельный класс с проверкой наличия такой директории
-sub createDir {
-    my ($self, %opt)            = @_;
-    my $dirname                 = $opt{-dirname}    // croak "You must specify '-dirname' param";
-
-    my $url = 'https://www.mediafire.com/api/1.4/folder/create.php';
-    my %param = (
-        'r'                 => 'sloe',
-        'foldername'        => $dirname,
-        'parent_key'        => '', 
-        'session_token'     => $self->{session_token},
-        'response_format'   => 'json',
-    );
-    $url . = '?' . join('&', map {"$_=" . uri_escape($param{$_})} keys %param);
-    my $res = $self->{ua}->get($url);
-    my $code = $res->code;
-    if ($code ne '200') {
-        croak "Can't create dir '$dirname'. Code: $code";
-    }
-    my $json_res = decode_json($res->decoded_content);
-    p $json_res;
-}
-=cut
 
 1;
 
@@ -383,7 +360,7 @@ Download file from mediafire.com to $dest_file
 
 =head1 DEPENDENCE
 
-L<LWP::UserAgent>, L<JSON::XS>, L<URI::Escape>, L<Encode>, L<HTTP::Request>, L<Carp>, L<File::Basename>, L<MIME::Detect>
+L<LWP::UserAgent>, L<JSON::XS>, L<URI::Escape>, L<Encode>, L<HTTP::Request>, L<Carp>, L<File::Basename>, L<MIME::Detect>, L<HTTP::Request>, L<Crypt::Digest::SHA256>
 
 =head1 AUTHORS
 

@@ -15,8 +15,6 @@ use JSON::XS;
 use Mediafire::Api::UploadFile;
 use Mediafire::Api::DownloadFile;
 
-use Data::Printer;
-
 our $VERSION = '0.01';
 
 ############################ PRIVATE METHODS ############################################
@@ -320,6 +318,12 @@ B<Mediafire::Api> - Upload and Download files from mediafire.com file sharing
         print "Found files: " . join(' ', map {$_->name()} @$find_result);
     }
 
+    # Download file from mediafire.com
+    $mediafire->downloadFile(
+        -mediafire_file     => $mediafire_file,
+        -dest_file          => './test_file.zip',
+    );
+
     
 
 =head1 Upload Files to server
@@ -366,6 +370,16 @@ Return arrayref with Mediafire::Api::file objects
 
     %opt:
         -filename       => Name of file to find
+
+=head1 Download files from mediafire.com
+
+=head2 downloadFile(%opt)
+
+Download file from mediafire.com to $dest_file
+    
+    %opt:
+        -mediafire_file         => Mediafire::Api::File object to download
+        -dest_file              => Name of file on local disk, in which will be downloaded mediafire file
 
 =head1 DEPENDENCE
 

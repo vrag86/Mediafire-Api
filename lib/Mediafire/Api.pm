@@ -13,6 +13,7 @@ use HTTP::Request;
 use JSON::XS;
 
 use Mediafire::Api::UploadFile;
+use Mediafire::Api::DownloadFile;
 
 use Data::Printer;
 
@@ -234,6 +235,17 @@ sub findFileByName {
     return \@mediafire_files;
 }
 
+sub downloadFile {
+    my ($self, %opt) = @_;
+
+    my $download_file = Mediafire::Api::DownloadFile->new(
+        -ua         => $self->{ua},
+    );
+    $download_file->downloadFile(%opt);
+
+
+}
+
 =pod Вынести в отдельный класс с проверкой наличия такой директории
 sub createDir {
     my ($self, %opt)            = @_;
@@ -300,6 +312,14 @@ B<Mediafire::Api> - Upload and Download files from mediafire.com file sharing
     # Get uploaded file key
     print "Uploaded file key: " . $mediafire_file->getDouploadKey() . "\n";
 
+    # Find file on mediafire.com by name. Return arrayref to Mediafire::Api::File objects
+    my $find_result = $mediafire->findFileByName(
+        -filename       => 'file_to_find.txt',
+    );
+    if (@$find_result) {
+        print "Found files: " . join(' ', map {$_->name()} @$find_result);
+    }
+
     
 
 =head1 Upload Files to server
@@ -308,6 +328,44 @@ B<Mediafire::Api> - Upload and Download files from mediafire.com file sharing
 =head2 new()
 
 =head2 login(%opt)
+
+=head1 Mediafire::Api::File
+
+=head2 name
+
+Set/Get name of file
+    $mediafire_file->name("New name");
+    my $name = $mediafire->name;
+
+=head2 key
+
+Set/Get download key of file
+
+    $mediafire_file->key("downloadfilekey");
+    my $key = $mediafire_file->key;
+
+=head2 size
+
+Set/Get size of file
+
+    $mediafire->size(2343);
+    my $size = $mediafire->size;
+
+=head2 hash
+
+Set/Get sha256sum hashsum of file
+
+    $mediafire_file->hash('dffdf');
+    my $hash = $mediafire_file->hash;
+
+=head1 Find files on mediafire.com
+
+=head2 findFileByName(%opt)
+
+Return arrayref with Mediafire::Api::file objects
+
+    %opt:
+        -filename       => Name of file to find
 
 =head1 DEPENDENCE
 

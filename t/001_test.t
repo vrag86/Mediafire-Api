@@ -35,6 +35,7 @@ use_ok('Mediafire::Api');
 my $LOGIN               = $ENV{MEDIAFIRE_LOGIN};
 my $PASSWORD            = $ENV{MEDIAFIRE_PASSWORD};
 my $UPLOAD_FILE         = File::Spec->catfile($CURR_DIR, 't', 'test_upload3.f');
+my $DEST_DOWNLOAD_FILE  = File::Spec->catfile($CURR_DIR, 't', 'downloaded_test_upload3.f');
 
 
 SKIP: {
@@ -53,8 +54,9 @@ SKIP: {
         skip $@;
     }
 
-    testUploadFile($mediafire, $UPLOAD_FILE);
+    my $mediafire_file = testUploadFile($mediafire, $UPLOAD_FILE);
     testFindFileByName($mediafire, basename($UPLOAD_FILE));
+    testDownloadFile($mediafire, $mediafire_file, $DEST_DOWNLOAD_FILE);
 
 };
 
@@ -80,6 +82,7 @@ sub testUploadFile {
 
     my $doupload_key = $upload_file->key;
     ok($doupload_key, "Test upload file. DouploadKey: $doupload_key");
+    return $upload_file;
 }
 
 sub testFindFileByName {
@@ -92,6 +95,18 @@ sub testFindFileByName {
     my $doupload_key = $res->[0]->key;
     ok($doupload_key, "Find file doupload_key: $doupload_key");
 
+}
+
+sub testDownloadFile {
+    my ($mediafire, $mediafire_file, $dest_file) = @_;
+
+    unlink($dest_file);
+    $mediafire->downloadFile(
+        -mediafire_file     => $mediafire_file,
+        -dest_file          => $dest_file,
+    );
+
+    ok (-f $dest_file, 'Test downloadFile()');
 }
 
 

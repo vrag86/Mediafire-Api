@@ -8,21 +8,16 @@ use open qw(:std :utf8);
 use Carp qw/croak carp/;
 use URI::Escape;
 use LWP::UserAgent;
-use LWP::ConnCache;
 use File::Basename;
 use HTTP::Request;
 use JSON::XS;
 use MIME::Detect;
 use Crypt::Digest::SHA256 qw/sha256_hex/;
 use Time::HiRes qw/gettimeofday/;
-use IO::Socket::SSL;
 
 use Mediafire::Api::File;
 
-use Data::Printer;
-
 our $VERSION = '0.01';
-
 
 my $DEFAULT_BUFF_SIZE           = 1048576;
 
@@ -81,8 +76,6 @@ $checkUploadFile = sub {
     if ($response->{storage_limit_exceeded} ne 'no') {
         croak "Can't checkUploadFile. Storage limit exceeded";
     }
-
-    p $response;
 
     my $file_key = $response->{preemptive_quickkey} // $response->{duplicate_quickkey};
     $self->{file}->key($file_key);
@@ -256,7 +249,7 @@ sub new {
     my $self = {};
     $self->{ua}             = $opt{-ua}                 // croak "You must specify param '-ua' for method new";
     $self->{session_token}  = $opt{-session_token}      // croak "You must specify '-session_token' param";
-    $self->{buff_size}      = $opt{-buff_zize}          // $DEFAULT_BUFF_SIZE;
+    $self->{buff_size}      = $opt{-buff_size}          // $DEFAULT_BUFF_SIZE;
     bless $self, $class;
     return $self;
 }
